@@ -1,5 +1,5 @@
 #!/bin/bash
-# Embed a file in shell script).
+# Embed file in shell script.
 #
 # usage: script [OPTIONS] SCRIPT
 #
@@ -20,8 +20,7 @@
 #     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
 #                          last '# include FILENAME' line by its content
 #     -u, --update FILE    update the embedded FILE in SCRIPT
-#     -U, --update-all     update all files embedded in SCRIPT considering they
-#                          are in current dir.
+#     -U, --update-all     update all embedded files (must be in current dir)
 #     -l, --list           list embedded files
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
@@ -39,7 +38,7 @@
 #
 # See the README or COPYING file for details.
 
-ACTION=list
+ACTION=list-files
 ENCODE=
 
 # doc is commented at the beggining of the script until first empty line
@@ -100,11 +99,11 @@ update-file ()
         set "$1" "$t"
     fi
 
-    sed -ir \
+    sed -i -r \
         -e '/^# begin '"$b"'($| .*$)/ a\# begin-tmp' \
         -e '/^# end '"$b"' *$/ i\# end-tmp' \
         "$1"
-    sed -ir \
+    sed -i -r \
         -e '/^# begin-tmp$/,/^# end-tmp$/ d' \
         -e '/^# begin '"$b"'($| .*$)/ r '"$2" \
         "$1"
@@ -121,7 +120,7 @@ extract-file ()
 
     sed -nr '/^# begin '"$2"'($| .*$)/,/^# end '"$2"'$/ p' "$1" \
         | sed '1d ; $d' \
-        | $cmd
+        | $cmd > "$2"
 }
 
 # list files embedded in $1
@@ -152,10 +151,14 @@ vrfy || die "needed tools are missing"
 
 # Action
 case "$ACTION" in
-    "add-file"|"update-file"|"extract-file")
+    "add-file"|"update-file")
         [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
         $ACTION "$SCRIPT" "$FILE" "$ENCODE"
+        ;;
+    "extract-file")
+        [ -z "$FILE" ] && die "no file specified"
+        $ACTION "$SCRIPT" "$FILE"
         ;;
     "update-all")
         list-files "$SCRIPT" | while file
