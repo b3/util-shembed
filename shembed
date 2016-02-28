@@ -74,14 +74,14 @@ add-file ()
     if [ -z "$l" ] ; then
         l='$' ; cmd=
     else
-        cmd='-e '"$l"'d'
+        cmd="-e ${l}d"
     fi
 
     sed -i \
         -e "$l"' a\# begin '"$f"' '"$3" \
         -e "$l"' r '$2\
         -e "$l"' a\# end '"$f" \
-        "$cmd" \
+        $cmd \
         $1
 
     [ $t ] && rm $t 
@@ -90,9 +90,9 @@ add-file ()
 # update $2 in $1
 update-file ()
 {
-    b=$(basename $2)
+    f=$(basename $2)
 
-    enc=$(sed -nr 's/^# begin '"$b"' (.*)$/\1/; t o; b; :o p' "$1")
+    enc=$(sed -nr 's/^# begin '"$f"' (.*)$/\1/; t o; b; :o p' "$1")
     if [ "x$enc" = xbase64 ] ; then
         t=$(mktemp)
         base64 "$2" > "$t"
@@ -100,12 +100,12 @@ update-file ()
     fi
 
     sed -i -r \
-        -e '/^# begin '"$b"'($| .*$)/ a\# begin-tmp' \
-        -e '/^# end '"$b"' *$/ i\# end-tmp' \
+        -e '/^# begin '"$f"'($| .*$)/ a\# begin-tmp' \
+        -e '/^# end '"$f"' *$/ i\# end-tmp' \
         "$1"
     sed -i -r \
         -e '/^# begin-tmp$/,/^# end-tmp$/ d' \
-        -e '/^# begin '"$b"'($| .*$)/ r '"$2" \
+        -e '/^# begin '"$f"'($| .*$)/ r '"$2" \
         "$1"
         
     [ $t ] && rm $t 
@@ -124,7 +124,7 @@ extract-file ()
 }
 
 # list files embedded in $1
-list-files () { grep '^# begin' $1 | sed -r -e 's/^# begin (.*)$/\1/' ; }
+list-files () { grep '^# begin' $1 | sed -r -e 's/^# begin ([^ ]+)($| .*$)/\1/' ; }
 
 # Args processing
 while [ -n $1 ]
@@ -133,7 +133,7 @@ do
         "-a"|"--add") ACTION=add-file ; shift ; FILE=$1 ;;
         "-u"|"--update") ACTION=update-file ; shift ; FILE=$1 ;;
         "-U"|"--update-all") ACTION=update-all ;;
-        "-l"|"--list") ACTION=list-files ; exit 0 ;;
+        "-l"|"--list") ACTION=list-files ;;
         "-x"|"--extract") ACTION=extract-file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract-all ;;
         "-s"|"--shell") declare -f list-files extract-file ; exit 0 ;;
@@ -161,13 +161,13 @@ case "$ACTION" in
         $ACTION "$SCRIPT" "$FILE"
         ;;
     "update-all")
-        list-files "$SCRIPT" | while file
+        list-files "$SCRIPT" | while read file
         do
             update-file "$SCRIPT" "$file"
         done
         ;;
     "extract-all")
-        list-files "$SCRIPT" | while file
+        list-files "$SCRIPT" | while read file
         do
             extract-file "$SCRIPT" "$file"
         done
