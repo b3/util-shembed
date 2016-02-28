@@ -14,7 +14,8 @@
 # In order to avoid shell conflicts, these lines are generally inserted after
 # and explicit 'exit 0'.
 #
-# If no action option is specified then '-l' is implied.
+# If no action option is specified then '-l' is implied. If more than one is
+# specified only the last one on command line is processed.
 #
 # OPTIONS
 #     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
