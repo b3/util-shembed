@@ -1,0 +1,189 @@
+#!/bin/bash
+# Embed a file in shell script).
+#
+# usage: script [OPTIONS] SCRIPT
+#
+# This script deals with file included in shell script between two surrounding
+# lines of the form
+#
+#     # begin FILENAME ENC
+#     # end FILENAME
+#
+# where ENC is optional and represent a specific encoding (base64).
+#
+# In order to avoid shell conflicts, these lines are generally present after
+# and explicit 'exit 0'.
+#
+# If no action option is specified then '-l' is implied.
+#
+# OPTIONS
+#     -a, --add FILE       embed FILE at the end of SCRIPT
+#     -i, --include FILE   include by replacing the '# include FILENAME' line
+#                          of SCRIPT by its content
+#     -u, --update FILE    update the embedded FILE
+#     -l, --list           list embedded files
+#     -x, --extract [FILE] extract FILE (or all files)
+#     -s, --shell          show shell functions to include in script
+#     -b, --base64         use base64 instead of cat when adding
+#     -h, --help           show this help message
+
+# Copyright (C) 1996 Bruno BEAUFILS <bruno@boulgour.com>
+#
+# This software comes with ABSOLUTELY NO WARRANTY.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation in its version 2.
+#
+# See the README or COPYING file for details.
+
+ACTION=list
+ENCODE=raw
+
+# doc is commented at the beggining of the script until first empty line
+doc () { sed -n '2,/^$/ { s/^ *#// ; s/^ //g ; t ok ; d ; :ok ; p }' <$0 ; }
+
+# die with an error message
+die () { echo "$(basename $0): error: $*" 1>&2 ; exit 1 ; }
+
+# run a command silently
+mute () { 1>/dev/null 2>&1 $* ; }
+
+# warn absence of $1, last parm may be used for listing needed debian packages
+need () { die "$1 is unavailable" ; }
+
+# verify if needed tools are available
+vrfy ()
+{
+    mute which base64 || need base64
+}
+
+# add $2 in $1, eventually encoded as $3
+add-file ()
+{
+    b=$(basename $2)
+
+    if [ "x$3" = "xbase64" ] ; then
+        t=$(mktemp)
+        base64 "$2" > "$t"
+        set "$1" "$t" "$3"
+    fi
+
+    l=$(sed -n '/^# include '"$b"' *$/ =' "$1" | tail -1)
+    if [ -z "$l" ] ; then
+        l='$'
+    else
+        c='-e '"$l"'d'
+    fi
+
+    sed \
+        -e "$l"' a\# begin '"$b"' '"$3" \
+        -e "$l"' r '$2\
+        -e "$l"' a\# end '"$b" \
+        "$c" \
+        $1
+
+    [ $t ] && rm $t 
+}
+
+# update $2 in $1
+update-file ()
+{
+    b=$(basename $2)
+
+    enc=$(sed -nr 's/^# begin '"$b"' (.*)$/\1/; t o; b; :o p' "$1")
+    if [ "x$enc" = xbase64 ] ; then
+        t=$(mktemp)
+        base64 "$2" > "$t"
+        set "$1" "$t"
+    fi
+
+    sed -ir \
+        -e '/^# begin '"$b"'($| .*$)/ a\# begin-tmp' \
+        -e '/^# end '"$b"' *$/ i\# end-tmp' \
+        "$1"
+    sed -ir \
+        -e '/^# begin-tmp$/,/^# end-tmp$/ d' \
+        -e '/^# begin '"$b"'($| .*$)/ r '"$2" \
+        "$1"
+        
+    [ $t ] && rm $t 
+}
+
+# extract $2 from a $1
+extract-file ()
+{
+    enc=$(sed -nr 's/^# begin '"$2"' (.*)$/\1/; t o; b; :o p' "$1")
+    cmd=cat
+    [ x$enc = xbase64 ] && cmd="base64 -d"
+
+    sed -nr '/^# begin '"$2"'($| .*$)/,/^# end '"$2"'$/ p' "$1" \
+        | sed '1d ; $d' \
+        | $cmd
+}
+
+# list files embedded in $1
+list-files () { grep '^# begin' $1 | sed -r -e 's/^# begin (.*)$/\1/' ; }
+
+# Args processing
+while [ -n $1 ]
+do
+    case "$1" in
+        "-a"|"--add")
+            ACTION=add
+            shift
+            FILE=$1
+            ;;
+        "-i"|"--include")
+            ACTION=include
+            shift
+            FILE=$1
+            ;;
+        "-u"|"--update")
+            ACTION=update
+            shift
+            FILE=$1
+            ;;
+        "-l"|"--list")
+            ACTION=list
+            exit 0
+            ;;
+        "-x"|"--extract")
+            ACTION=extract
+            shift
+            FILE=$1
+            ;;
+        "-s"|"--shell")
+            declare -f list-files extract-file
+            exit 0
+            ;;
+        "-b"|"--base64")
+            ENCODE=base64
+            ;;
+        "-h"|"--help")
+            doc
+            exit 0
+            ;;
+        *) break ;;
+    esac
+    shift
+done
+
+SCRIPT=$1
+
+# Common checks
+vrfy || die "needed tools are missing"
+
+[ -z $SCRIPT ] && die "no script specified"
+
+# Action
+case "$ACTION" in
+    "add"|"include"|"update"|"extract")
+        [ -z "FILE" ] && die "no file specified"
+        [ ! -r "$FILE" ] && die "cannot read $FILE"
+        $ACTION "$SCRIPT" "$FILE" "$ENCODE"
+        ;;
+    "list"|*)
+        list-files "$SCRIPT"
+        ;;
+esac
