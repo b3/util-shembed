@@ -9,25 +9,25 @@
 #     # begin FILENAME ENC
 #     # end FILENAME
 #
-# where ENC is optional and represent a specific encoding (base64).
+# where ENC is optional and represents a specific encoding (base64).
 #
-# In order to avoid shell conflicts, these lines are generally present after
+# In order to avoid shell conflicts, these lines are generally inserted after
 # and explicit 'exit 0'.
 #
 # If no action option is specified then '-l' is implied.
 #
 # OPTIONS
-#     -a, --add FILE       embed FILE at the end of SCRIPT
-#     -i, --include FILE   include by replacing the '# include FILENAME' line
-#                          of SCRIPT by its content
-#     -u, --update FILE    update the embedded FILE
+#     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
+#                          last '# include FILENAME' line by its content
+#     -u, --update FILE    update the embedded FILE in SCRIPT
 #     -l, --list           list embedded files
-#     -x, --extract [FILE] extract FILE (or all files)
+#     -x, --extract FILE   extract FILE
+#     -X, --extract-all    extract all files
 #     -s, --shell          show shell functions to include in script
 #     -b, --base64         use base64 instead of cat when adding
 #     -h, --help           show this help message
 
-# Copyright (C) 1996 Bruno BEAUFILS <bruno@boulgour.com>
+# Copyright (C) 2016 Bruno BEAUFILS <bruno@boulgour.com>
 #
 # This software comes with ABSOLUTELY NO WARRANTY.
 #
@@ -38,7 +38,7 @@
 # See the README or COPYING file for details.
 
 ACTION=list
-ENCODE=raw
+ENCODE=
 
 # doc is commented at the beggining of the script until first empty line
 doc () { sed -n '2,/^$/ { s/^ *#// ; s/^ //g ; t ok ; d ; :ok ; p }' <$0 ; }
@@ -58,10 +58,10 @@ vrfy ()
     mute which base64 || need base64
 }
 
-# add $2 in $1, eventually encoded as $3
+# add $2 in $1 eventually encoded as $3
 add-file ()
 {
-    b=$(basename $2)
+    f=$(basename $2)
 
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
@@ -69,18 +69,18 @@ add-file ()
         set "$1" "$t" "$3"
     fi
 
-    l=$(sed -n '/^# include '"$b"' *$/ =' "$1" | tail -1)
+    l=$(sed -n '/^# include '"$f"' *$/ =' "$1" | tail -1)
     if [ -z "$l" ] ; then
-        l='$'
+        l='$' ; cmd=
     else
-        c='-e '"$l"'d'
+        cmd='-e '"$l"'d'
     fi
 
-    sed \
-        -e "$l"' a\# begin '"$b"' '"$3" \
+    sed -i \
+        -e "$l"' a\# begin '"$f"' '"$3" \
         -e "$l"' r '$2\
-        -e "$l"' a\# end '"$b" \
-        "$c" \
+        -e "$l"' a\# end '"$f" \
+        "$cmd" \
         $1
 
     [ $t ] && rm $t 
@@ -129,61 +129,38 @@ list-files () { grep '^# begin' $1 | sed -r -e 's/^# begin (.*)$/\1/' ; }
 while [ -n $1 ]
 do
     case "$1" in
-        "-a"|"--add")
-            ACTION=add
-            shift
-            FILE=$1
-            ;;
-        "-i"|"--include")
-            ACTION=include
-            shift
-            FILE=$1
-            ;;
-        "-u"|"--update")
-            ACTION=update
-            shift
-            FILE=$1
-            ;;
-        "-l"|"--list")
-            ACTION=list
-            exit 0
-            ;;
-        "-x"|"--extract")
-            ACTION=extract
-            shift
-            FILE=$1
-            ;;
-        "-s"|"--shell")
-            declare -f list-files extract-file
-            exit 0
-            ;;
-        "-b"|"--base64")
-            ENCODE=base64
-            ;;
-        "-h"|"--help")
-            doc
-            exit 0
-            ;;
+        "-a"|"--add") ACTION=add-file ; shift ; FILE=$1 ;;
+        "-u"|"--update") ACTION=update-file ; shift ; FILE=$1 ;;
+        "-l"|"--list") ACTION=list-files ; exit 0 ;;
+        "-x"|"--extract") ACTION=extract-file ; shift ; FILE=$1 ;;
+        "-X"|"--extract-all") ACTION=extract-all ;;
+        "-s"|"--shell") declare -f list-files extract-file ; exit 0 ;;
+        "-b"|"--base64") ENCODE=base64 ;;
+        "-h"|"--help") doc ; exit 0 ;;
         *) break ;;
     esac
     shift
 done
-
 SCRIPT=$1
 
 # Common checks
 vrfy || die "needed tools are missing"
-
 [ -z $SCRIPT ] && die "no script specified"
 
 # Action
 case "$ACTION" in
-    "add"|"include"|"update"|"extract")
-        [ -z "FILE" ] && die "no file specified"
+    "add-file"|"update-file"|"extract-file")
+        [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
         $ACTION "$SCRIPT" "$FILE" "$ENCODE"
         ;;
-    "list"|*)
+    "extract-all")
+        list-files "$SCRIPT" | while file
+        do
+            extract-file "$SCRIPT" "$file"
+        done
+        ;;
+    "list-files"|*)
         list-files "$SCRIPT"
         ;;
 esac
