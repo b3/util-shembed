@@ -20,6 +20,8 @@
 #     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
 #                          last '# include FILENAME' line by its content
 #     -u, --update FILE    update the embedded FILE in SCRIPT
+#     -U, --update-all     update all files embedded in SCRIPT considering they
+#                          are in current dir.
 #     -l, --list           list embedded files
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
@@ -131,6 +133,7 @@ do
     case "$1" in
         "-a"|"--add") ACTION=add-file ; shift ; FILE=$1 ;;
         "-u"|"--update") ACTION=update-file ; shift ; FILE=$1 ;;
+        "-U"|"--update-all") ACTION=update-all ;;
         "-l"|"--list") ACTION=list-files ; exit 0 ;;
         "-x"|"--extract") ACTION=extract-file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract-all ;;
@@ -153,6 +156,12 @@ case "$ACTION" in
         [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
         $ACTION "$SCRIPT" "$FILE" "$ENCODE"
+        ;;
+    "update-all")
+        list-files "$SCRIPT" | while file
+        do
+            update-file "$SCRIPT" "$file"
+        done
         ;;
     "extract-all")
         list-files "$SCRIPT" | while file
