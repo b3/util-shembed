@@ -12,7 +12,7 @@
 # where ENC is optional and represents a specific encoding (base64).
 #
 # In order to avoid shell conflicts, these lines are generally inserted after
-# and explicit 'exit 0'.
+# an explicit 'exit 0'.
 #
 # If no action option is specified then '-l' is implied. If more than one is
 # specified only the last one on command line is processed.
@@ -112,7 +112,7 @@ update-file ()
     [ $t ] && rm $t 
 }
 
-# extract $2 from a $1
+# extract $2 from $1
 extract-file ()
 {
     enc=$(sed -nr 's/^# begin '"$2"' (.*)$/\1/; t o; b; :o p' "$1")
