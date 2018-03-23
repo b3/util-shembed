@@ -10,7 +10,7 @@ test_list() {
     assertEqual "$($cmd -l script)" "file1"
 }
 
-test_list_tags() {
+test_list_with_tags() {
     reset
 
     # untagged files not listed

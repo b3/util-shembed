@@ -28,6 +28,7 @@
 #     -u, --update FILE    update the embedded FILE in SCRIPT
 #     -U, --update-all     update all embedded files (must be in current dir)
 #     -l, --list           list embedded files
+#     -L, --list-tags      list tags 
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
 #     -r, --remove FILE    remove FILE
@@ -168,6 +169,18 @@ list_files ()
     fi
 }
 
+# list tags used in $1
+list_tags()
+{
+	sed -rne \
+		'/^# begin(-[^- ]+)* / {
+			 s/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\1/ ;
+			 s/-/\n/g ;
+			 p
+		}' $1 \
+	| sort | uniq
+}
+
 # remove $2 from $1
 remove_file ()
 {
@@ -188,6 +201,7 @@ do
         "-u"|"--update") ACTION=update_file ; shift ; FILE=$1 ;;
         "-U"|"--update-all") ACTION=update_all ;;
         "-l"|"--list") ACTION=list_files ;;
+		"-L"|"--list-tags") ACTION=list_tags ;;
         "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract_all ;;
         "-r"|"--remove") ACTION=remove_file ; shift ; FILE=$1 ;;
@@ -239,6 +253,9 @@ case "$ACTION" in
         [ -z "$FILE" ] && die "no file specified"
         $ACTION "$SCRIPT" "$FILE"
         ;;
+	"list_tags")
+		list_tags "$SCRIPT"
+		;;
     "list_files"|*)
         list_files "$SCRIPT" "$TAGS"
         ;;

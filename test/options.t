@@ -4,6 +4,10 @@ test_options_tags () {
     reset
     
     m="$errmsg -t usable only when adding/listing files"
+
+	c="$cmd -L -t tag1 -t tag2 script"
+    assertNotReturn "$(stderr $c)" "0"
+    assertEqual "$(stderr $c)" "$m"
     
     c="$cmd -u file1 -t tag1 -t tag2 script"
     assertNotReturn "$(stderr $c)" "0"
