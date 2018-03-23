@@ -18,7 +18,9 @@
 # an explicit 'exit 0'.
 #
 # If no action option is specified then '-l' is implied. If more than one is
-# specified only the last one on command line is processed.
+# specified only the last one on command line is processed. If multiple tags
+# are specified '-l' list only files tagged with all tags (conjonction or
+# logical and is assumed).
 #
 # ACTIONS
 #     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
@@ -139,10 +141,31 @@ extract_file ()
         | $cmd > "$2"
 }
 
-# list files embedded in $1
+# list files embedded in $1 eventually tagged by $2
 list_files ()
 {
-    grep '^# begin' $1 | sed -re 's/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/'
+    # with tags
+    if [ -n "$2" ] ; then
+        for tag in $(sed 'y/-/ /' <<< "$2")
+        do
+            files=$(sed -rne \
+                        '/^# begin(-[^- ]+)*-'"$tag"'(-[^- ]+)* / {
+                             s/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/ ;
+                             p
+                        }' $1)
+            result=$(sed 's/ /\n/g' <<<$files \
+                     | grep ${result:+-F} $(sed 's/^/-e /g' <<<${result:-.}))
+        done
+        sed 's/ /\n/g' <<< "$result" | sort
+    # without tags
+    else
+        sed -rne \
+            '/^# begin([^ ]*) / {
+                  s/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/ ;
+                  p
+             }' $1 \
+        | sort
+    fi
 }
 
 # remove $2 from $1
@@ -186,7 +209,8 @@ SCRIPT=$1
 vrfy || die "needed tools are missing"
 [ -z $SCRIPT ] && die "no script specified"
 [ $# -gt 1 ] && die "too many script specified"
-[ "$ACTION" != "add_file" -a -n "$TAGS" ] && die "-t can only be used when adding files"
+[ "$ACTION" != "add_file" -a "$ACTION" != "list_files" -a -n "$TAGS" ] &&
+    die "-t usable only when adding/listing files"
     
 # Action
 case "$ACTION" in
@@ -216,7 +240,7 @@ case "$ACTION" in
         $ACTION "$SCRIPT" "$FILE"
         ;;
     "list_files"|*)
-        list_files "$SCRIPT"
+        list_files "$SCRIPT" "$TAGS"
         ;;
 esac
 
