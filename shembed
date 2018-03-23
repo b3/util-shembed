@@ -36,7 +36,7 @@
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
 #     -r, --remove FILE    remove FILE
-#     -s, --shell          show shell functions to include in script
+#     -s, --shell          show shell helper functions to include in script
 #     -V, --version        show version number
 #     -h, --help           show this help message
 #
