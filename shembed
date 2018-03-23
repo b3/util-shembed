@@ -28,6 +28,7 @@
 #     -l, --list           list embedded files
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
+#     -r, --remove FILE    remove FILE
 #     -s, --shell          show shell functions to include in script
 #     -h, --help           show this help message
 #
@@ -71,7 +72,7 @@ add_file ()
 {
     f=$(basename $2)
 
-    list_files $1 | grep -q $2 && die "file already included"
+    list_files $1 | grep -q $2 && die "file already included $2"
     
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
@@ -144,6 +145,18 @@ list_files ()
     grep '^# begin' $1 | sed -re 's/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/'
 }
 
+# remove $2 from $1
+remove_file ()
+{
+    f=${2##/*}
+
+    list_files $1 | grep -q $2 || die "file not included $2"
+
+    sed -i -r \
+        -e '/^# begin(-[^- ]+)* '"$f"'($| .*$)/,/^# end '"$f"' *$/ d' \
+        $1
+}
+
 # Args processing
 while [ -n $1 ]
 do
@@ -154,6 +167,7 @@ do
         "-l"|"--list") ACTION=list_files ;;
         "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract_all ;;
+        "-r"|"--remove") ACTION=remove_file ; shift ; FILE=$1 ;;
         "-s"|"--shell") declare -f list_files extract_file ; exit 0 ;;
         "-b"|"--base64") ENCODE=base64 ;;   
         "-h"|"--help") doc ; exit 0 ;;
@@ -196,6 +210,10 @@ case "$ACTION" in
         do
             extract_file "$SCRIPT" "$file"
         done
+        ;;
+    "remove_file")
+        [ -z "$FILE" ] && die "no file specified"
+        $ACTION "$SCRIPT" "$FILE"
         ;;
     "list_files"|*)
         list_files "$SCRIPT"
