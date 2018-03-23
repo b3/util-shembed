@@ -4,18 +4,23 @@
 # usage: script [ACTIONS|OPTIONS] SCRIPT
 #
 # This script deals with file included in shell script between two surrounding
-# lines of the form
+# lines.
+#
+# In order to avoid shell conflicts, these lines are generally inserted after
+# an explicit 'exit 0'. When adding a file it is embeded at the end of the
+# specified SCRIPT or by replacing the last '# include FILENAME' line found in
+# SCRIPT by its content.
+#
+# Surrounding lines have one of the form
 #
 #     # begin FILENAME ENC
 #     # end FILENAME
 #
-# where ENC is optional and represents a specific encoding (base64).
+#     # begin-TAG1-TAG2 FILENAME ENC
+#     # end FILENAME
 #
-# The 'begin' word may be suffixed by tags as a list of words, each prefixed
-# by a dash.
-#
-# In order to avoid shell conflicts, these lines are generally inserted after
-# an explicit 'exit 0'.
+# where ENC is optional and represents a specific encoding (base64). Tags are
+# suffixing the 'begin' word as a list of words, each prefixed by a dash.
 #
 # If no action option is specified then '-l' is implied. If more than one is
 # specified only the last one on command line is processed. If multiple tags
@@ -23,8 +28,7 @@
 # logical and is assumed).
 #
 # ACTIONS
-#     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
-#                          last '# include FILENAME' line by its content
+#     -a, --add FILE       embed FILE in SCRIPT
 #     -u, --update FILE    update the embedded FILE in SCRIPT
 #     -U, --update-all     update all embedded files (must be in current dir)
 #     -l, --list           list embedded files
@@ -33,6 +37,7 @@
 #     -X, --extract-all    extract all files
 #     -r, --remove FILE    remove FILE
 #     -s, --shell          show shell functions to include in script
+#     -V, --version        show version number
 #     -h, --help           show this help message
 #
 # OPTIONS
@@ -172,13 +177,13 @@ list_files ()
 # list tags used in $1
 list_tags()
 {
-	sed -rne \
-		'/^# begin(-[^- ]+)* / {
-			 s/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\1/ ;
-			 s/-/\n/g ;
-			 p
-		}' $1 \
-	| sort | uniq
+    sed -rne \
+        '/^# begin(-[^- ]+)* / {
+             s/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\1/ ;
+             s/-/\n/g ;
+             p
+        }' $1 \
+    | sort | uniq
 }
 
 # remove $2 from $1
@@ -201,7 +206,7 @@ do
         "-u"|"--update") ACTION=update_file ; shift ; FILE=$1 ;;
         "-U"|"--update-all") ACTION=update_all ;;
         "-l"|"--list") ACTION=list_files ;;
-		"-L"|"--list-tags") ACTION=list_tags ;;
+        "-L"|"--list-tags") ACTION=list_tags ;;
         "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract_all ;;
         "-r"|"--remove") ACTION=remove_file ; shift ; FILE=$1 ;;
@@ -253,9 +258,9 @@ case "$ACTION" in
         [ -z "$FILE" ] && die "no file specified"
         $ACTION "$SCRIPT" "$FILE"
         ;;
-	"list_tags")
-		list_tags "$SCRIPT"
-		;;
+    "list_tags")
+        list_tags "$SCRIPT"
+        ;;
     "list_files"|*)
         list_files "$SCRIPT" "$TAGS"
         ;;
