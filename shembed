@@ -47,7 +47,7 @@
 
 # TODO: acknowledge that there may not be two files of the same name
 
-ACTION=list-files
+ACTION=list_files
 ENCODE=raw
 
 # doc is commented at the beggining of the script until first empty line
@@ -69,18 +69,18 @@ vrfy ()
 }
 
 # add $2 in $1 encoded as $3 eventually using $4 as tags
-add-file ()
+add_file ()
 {
     f=$(basename $2)
 
-	list-files $1 | grep -q $2 && die "file already included"
-	
+    list_files $1 | grep -q $2 && die "file already included"
+    
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
         base64 "$2" > "$t"
         set "$1" "$t" "$3" "$4"
-	else
-		set "$1" "$2" "" "$4"
+    else
+        set "$1" "$2" "" "$4"
     fi
 
     l=$(sed -n '/^# include '"$f"' *$/ =' "$1" | tail -1)
@@ -101,7 +101,7 @@ add-file ()
 }
 
 # update $2 in $1
-update-file ()
+update_file ()
 {
     f=$(basename $2)
 
@@ -127,7 +127,7 @@ update-file ()
 }
 
 # extract $2 from $1
-extract-file ()
+extract_file ()
 {
     enc=$(sed -nr 's/^# begin(-[^- ]+)* '"$2"' (.*)$/\2/; t o; b; :o p' "$1")
     cmd=cat
@@ -141,7 +141,7 @@ extract-file ()
 }
 
 # list files embedded in $1
-list-files ()
+list_files ()
 {
     grep '^# begin' $1 | sed -re 's/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/'
 }
@@ -150,13 +150,13 @@ list-files ()
 while [ -n $1 ]
 do
     case "$1" in
-        "-a"|"--add") ACTION=add-file ; shift ; FILE=$1 ;;
-        "-u"|"--update") ACTION=update-file ; shift ; FILE=$1 ;;
-        "-U"|"--update-all") ACTION=update-all ;;
-        "-l"|"--list") ACTION=list-files ;;
-        "-x"|"--extract") ACTION=extract-file ; shift ; FILE=$1 ;;
-        "-X"|"--extract-all") ACTION=extract-all ;;
-        "-s"|"--shell") declare -f list-files extract-file ; exit 0 ;;
+        "-a"|"--add") ACTION=add_file ; shift ; FILE=$1 ;;
+        "-u"|"--update") ACTION=update_file ; shift ; FILE=$1 ;;
+        "-U"|"--update-all") ACTION=update_all ;;
+        "-l"|"--list") ACTION=list_files ;;
+        "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
+        "-X"|"--extract-all") ACTION=extract_all ;;
+        "-s"|"--shell") declare -f list_files extract_file ; exit 0 ;;
         "-b"|"--base64") ENCODE=base64 ;;   
         "-h"|"--help") doc ; exit 0 ;;
         "-t"|"--tag")
@@ -174,33 +174,33 @@ SCRIPT=$1
 vrfy || die "needed tools are missing"
 [ -z $SCRIPT ] && die "no script specified"
 [ $# -gt 1 ] && die "too many script specified"
-[ "$ACTION" != "add-file" -a -n "$TAGS" ] && die "-t can only be used when adding files"
-	
+[ "$ACTION" != "add_file" -a -n "$TAGS" ] && die "-t can only be used when adding files"
+    
 # Action
 case "$ACTION" in
-    "add-file"|"update-file")
+    "add_file"|"update_file")
         [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
         $ACTION "$SCRIPT" "$FILE" "$ENCODE" "$TAGS"
         ;;
-    "extract-file")
+    "extract_file")
         [ -z "$FILE" ] && die "no file specified"
         $ACTION "$SCRIPT" "$FILE"
         ;;
-    "update-all")
-        list-files "$SCRIPT" | while read file
+    "update_all")
+        list_files "$SCRIPT" | while read file
         do
-            update-file "$SCRIPT" "$file"
+            update_file "$SCRIPT" "$file"
         done
         ;;
-    "extract-all")
-        list-files "$SCRIPT" | while read file
+    "extract_all")
+        list_files "$SCRIPT" | while read file
         do
-            extract-file "$SCRIPT" "$file"
+            extract_file "$SCRIPT" "$file"
         done
         ;;
-    "list-files"|*)
-        list-files "$SCRIPT"
+    "list_files"|*)
+        list_files "$SCRIPT"
         ;;
 esac
 
