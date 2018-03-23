@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 
+# helpers
 cmd="$(cd $(dirname $0)/.. ; pwd)/shembed"
-
+dir="$(cd $(dirname $0) ; pwd)"
 errmsg="${cmd##*/}: error:"
 stderr() { $* 2>&1 1>/dev/null ; }
 cporig() { for f in "$@" ; do cp $f.orig $f ; done ; }
 mute() { $* 1>/dev/null 2>&1 ; }
 
+# test cases definition
+cd $dir
 for testfile in *.t
 do
     source $testfile
 done
 
+# test environment setup
+mkdir -p $dir/tmp
+cd $dir/tmp
 init
+trap '[ $? -eq 0 ] && clean && rmdir $dir/tmp' exit
 
-trap clean exit
-
-source $(dirname $0)/bashunit.bash
+# tests run
+source $dir/bashunit.bash
