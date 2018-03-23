@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+cmd="$(cd $(dirname $0)/.. ; pwd)/shembed"
+
+errmsg="${cmd##*/}: error:"
+stderr() { $* 2>&1 1>/dev/null ; }
+cporig() { for f in "$@" ; do cp $f.orig $f ; done ; }
+mute() { $* 1>/dev/null 2>&1 ; }
+
+for testfile in *.t
+do
+    source $testfile
+done
+
+init
+
+trap clean exit
+
+source $(dirname $0)/bashunit.bash
