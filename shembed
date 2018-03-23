@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Embed file in shell script.
 #
-# usage: script [OPTIONS] SCRIPT
+# usage: script [ACTIONS|OPTIONS] SCRIPT
 #
 # This script deals with file included in shell script between two surrounding
 # lines of the form
@@ -11,13 +11,16 @@
 #
 # where ENC is optional and represents a specific encoding (base64).
 #
+# The 'begin' word may be suffixed by tags as a list of words, each prefixed
+# by a dash.
+#
 # In order to avoid shell conflicts, these lines are generally inserted after
 # an explicit 'exit 0'.
 #
 # If no action option is specified then '-l' is implied. If more than one is
 # specified only the last one on command line is processed.
 #
-# OPTIONS
+# ACTIONS
 #     -a, --add FILE       embed FILE at the end of SCRIPT or by replacing the
 #                          last '# include FILENAME' line by its content
 #     -u, --update FILE    update the embedded FILE in SCRIPT
@@ -26,10 +29,13 @@
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
 #     -s, --shell          show shell functions to include in script
-#     -b, --base64         use base64 instead of cat when adding
 #     -h, --help           show this help message
+#
+# OPTIONS
+#     -b, --base64         use base64 instead of cat when adding
+#     -t, --tag STRING     add STRING as tag (maybe used many times)
 
-# Copyright (C) 2016 Bruno BEAUFILS <bruno@boulgour.com>
+# Copyright (C) 2016,2018 Bruno BEAUFILS <bruno@boulgour.com>
 #
 # This software comes with ABSOLUTELY NO WARRANTY.
 #
@@ -42,7 +48,7 @@
 # TODO: acknowledge that there may not be two files of the same name
 
 ACTION=list-files
-ENCODE=
+ENCODE=raw
 
 # doc is commented at the beggining of the script until first empty line
 doc () { sed -n '2,/^$/ { s/^ *#// ; s/^ //g ; t ok ; d ; :ok ; p }' <$0 ; }
@@ -62,15 +68,19 @@ vrfy ()
     mute which base64 || need base64
 }
 
-# add $2 in $1 eventually encoded as $3
+# add $2 in $1 encoded as $3 eventually using $4 as tags
 add-file ()
 {
     f=$(basename $2)
 
+	list-files $1 | grep -q $2 && die "file already included"
+	
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
         base64 "$2" > "$t"
-        set "$1" "$t" "$3"
+        set "$1" "$t" "$3" "$4"
+	else
+		set "$1" "$2" "" "$4"
     fi
 
     l=$(sed -n '/^# include '"$f"' *$/ =' "$1" | tail -1)
@@ -81,7 +91,7 @@ add-file ()
     fi
 
     sed -i \
-        -e "$l"' a\# begin '"$f"' '"$3" \
+        -e "$l"' a\# begin'"$4"' '"$f"' '"$3" \
         -e "$l"' r '$2\
         -e "$l"' a\# end '"$f" \
         $cmd \
@@ -95,20 +105,22 @@ update-file ()
 {
     f=$(basename $2)
 
-    enc=$(sed -nr 's/^# begin '"$f"' (.*)$/\1/; t o; b; :o p' "$1")
+    enc=$(sed -nr 's/^# begin(-[^- ]+)* '"$f"' (.*)$/\2/; t o; b; :o p' "$1")
     if [ "x$enc" = xbase64 ] ; then
         t=$(mktemp)
         base64 "$2" > "$t"
         set "$1" "$t"
     fi
 
+    tags=$(sed -nr 's/^# begin((-[^- ]+)*) '"$f"' .*$/\1/; t o; b; :o p' "$1")
+    
     sed -i -r \
-        -e '/^# begin '"$f"'($| .*$)/ a\# begin-tmp' \
-        -e '/^# end '"$f"' *$/ i\# end-tmp' \
+        -e '/^# begin'"$tags"' '"$f"'($| .*$)/ a\# begin+tmp'"$tags"'' \
+        -e '/^# end '"$f"' *$/ i\# end+tmp' \
         "$1"
     sed -i -r \
-        -e '/^# begin-tmp$/,/^# end-tmp$/ d' \
-        -e '/^# begin '"$f"'($| .*$)/ r '"$2" \
+        -e '/^# begin\+tmp/,/^# end\+tmp$/ d' \
+        -e '/^# begin'"$tags"' '"$f"'($| .*$)/ r '"$2" \
         "$1"
         
     [ $t ] && rm $t 
@@ -117,17 +129,22 @@ update-file ()
 # extract $2 from $1
 extract-file ()
 {
-    enc=$(sed -nr 's/^# begin '"$2"' (.*)$/\1/; t o; b; :o p' "$1")
+    enc=$(sed -nr 's/^# begin(-[^- ]+)* '"$2"' (.*)$/\2/; t o; b; :o p' "$1")
     cmd=cat
     [ x$enc = xbase64 ] && cmd="base64 -d"
 
-    sed -nr '/^# begin '"$2"'($| .*$)/,/^# end '"$2"'$/ p' "$1" \
+    tags=$(sed -nr 's/^# begin((-[^- ]+)*) '"$2"' .*$/\1/; t o; b; :o p' "$1")
+    
+    sed -nr '/^# begin'"$tags"' '"$2"'($| .*$)/,/^# end '"$2"'$/ p' "$1" \
         | sed '1d ; $d' \
         | $cmd > "$2"
 }
 
 # list files embedded in $1
-list-files () { grep '^# begin' $1 | sed -r -e 's/^# begin ([^ ]+)($| .*$)/\1/' ; }
+list-files ()
+{
+    grep '^# begin' $1 | sed -re 's/^# begin((-[^- ]+)*) ([^ ]+)($| .*$)/\3/'
+}
 
 # Args processing
 while [ -n $1 ]
@@ -140,8 +157,13 @@ do
         "-x"|"--extract") ACTION=extract-file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract-all ;;
         "-s"|"--shell") declare -f list-files extract-file ; exit 0 ;;
-        "-b"|"--base64") ENCODE=base64 ;;
+        "-b"|"--base64") ENCODE=base64 ;;   
         "-h"|"--help") doc ; exit 0 ;;
+        "-t"|"--tag")
+            shift
+            [ -z "$1" ] && die "missing tag"
+            TAGS="$TAGS-$(tr -d ' -' <<< $1)"
+            ;;
         *) break ;;
     esac
     shift
@@ -151,13 +173,15 @@ SCRIPT=$1
 # Common checks
 vrfy || die "needed tools are missing"
 [ -z $SCRIPT ] && die "no script specified"
-
+[ $# -gt 1 ] && die "too many script specified"
+[ "$ACTION" != "add-file" -a -n "$TAGS" ] && die "-t can only be used when adding files"
+	
 # Action
 case "$ACTION" in
     "add-file"|"update-file")
         [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
-        $ACTION "$SCRIPT" "$FILE" "$ENCODE"
+        $ACTION "$SCRIPT" "$FILE" "$ENCODE" "$TAGS"
         ;;
     "extract-file")
         [ -z "$FILE" ] && die "no file specified"
@@ -179,3 +203,5 @@ case "$ACTION" in
         list-files "$SCRIPT"
         ;;
 esac
+
+exit 0
