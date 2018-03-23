@@ -45,8 +45,6 @@
 #
 # See the README or COPYING file for details.
 
-# TODO: acknowledge that there may not be two files of the same name
-
 ACTION=list_files
 ENCODE=raw
 
