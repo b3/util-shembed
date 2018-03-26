@@ -38,4 +38,13 @@ file2"
     assertReturn "$($cmd -l -t tag1 -t tag2 script)" 0
     assertEqual "$($cmd -l -t tag2 -t tag2 script)" "file1
 file3"
+
+	# same filename under two different tags
+	reset
+	mute $cmd -a file2 -t tag1 script
+	cp file3 file2
+	mute "$(stderr $cmd -a file2 -t tag2 script)" 0
+	assertEqual "$($cmd script)" "file1
+file2
+file2"
 }

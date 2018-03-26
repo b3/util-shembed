@@ -54,7 +54,7 @@
 #
 # See the README or COPYING file for details.
 
-VERSION=1.0.20180323
+VERSION=1.0.20180326-1
 ACTION=list_files
 ENCODE=raw
 
@@ -81,7 +81,9 @@ add_file ()
 {
     f=$(basename $2)
 
-    list_files $1 | grep -q $2 && die "file already included $2"
+	if list_files $1 $4 | grep -q $2 ; then
+		die "file already included"
+	fi
     
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
@@ -232,7 +234,7 @@ vrfy || die "needed tools are missing"
 [ -z $SCRIPT ] && die "no script specified"
 [ $# -gt 1 ] && die "too many script specified"
 [ "$ACTION" != "add_file" -a "$ACTION" != "list_files" -a -n "$TAGS" ] &&
-    die "-t usable only when adding/listing files"
+    die "-t usable only with -a, -l or -x"
     
 # Action
 case "$ACTION" in
