@@ -54,7 +54,7 @@
 #
 # See the README or COPYING file for details.
 
-VERSION=1.0.20180326-1
+VERSION=1.0.20180326-2
 ACTION=list_files
 ENCODE=raw
 
