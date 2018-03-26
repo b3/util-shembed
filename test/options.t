@@ -3,7 +3,7 @@
 test_options_tags () {
     reset
     
-    m="$errmsg -t usable only with -a, -u, -l or -x"
+    m="$errmsg -t usable only with -a, -l or -x"
 
 	c="$cmd -L -t tag1 -t tag2 script"
     assertNotReturn "$(stderr $c)" "0"
