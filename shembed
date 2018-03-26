@@ -81,7 +81,7 @@ add_file ()
 {
     f=$(basename $2)
 
-	if list_files $1 $4 | grep -q $2 ; then
+	if list_files $1 $4 | grep -q $f ; then
 		die "file already included"
 	fi
     
