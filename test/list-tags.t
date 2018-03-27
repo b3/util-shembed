@@ -3,9 +3,11 @@
 test_list_tags() {
     reset
 
+    # No tags
     assertReturn "$($cmd -L script)" 0
     assertEqual "$($cmd -L script)" ""
 
+    # Correct list of tags
     mute $cmd -a file2 -t tag1 -t tag2 script
     mute $cmd -a file3 -t tag2 -t tag1 -t tag3 script
     assertReturn "$($cmd -L script)" 0
