@@ -22,11 +22,6 @@
 # where ENC is optional and represents a specific encoding (base64). Tags are
 # suffixing the 'begin' word as a list of words, each prefixed by a dash.
 #
-# If no action option is specified then '-l' is implied. If more than one is
-# specified only the last one on command line is processed. If multiple tags
-# are specified '-l' list only files tagged with all tags (conjonction or
-# logical and is assumed).
-#
 # ACTIONS
 #     -a, --add FILE       embed FILE in SCRIPT
 #     -u, --update FILE    update the embedded FILE in SCRIPT
@@ -42,7 +37,20 @@
 #
 # OPTIONS
 #     -b, --base64         use base64 instead of cat when adding
-#     -t, --tag STRING     add STRING as tag (maybe used many times)
+#     -t, --tag STRING     add tag STRING or limit to STRING-tagged files
+#
+# If no action option is specified then '-l' is implied. If more than one is
+# specified only the last one on command line is processed.
+#
+# Once an encoding has been set for a file it cannot be change (aka -b is
+# useful only with -a).
+#
+# If multiple tags are specified '-l' list only files tagged with all tags
+# (conjonction, aka logical and, is assumed).
+#
+# Extraction is done from beginning to end of script. This means that if a
+# file is included more than once (with different tags) when using -X the last
+# will be the one actually extracted.
 
 # Copyright (C) 2016,2018 Bruno BEAUFILS <bruno@boulgour.com>
 #
@@ -54,15 +62,19 @@
 #
 # See the README or COPYING file for details.
 
-VERSION=1.0.20180326-2
+VERSION=1.1.20180327-1
 ACTION=list_files
 ENCODE=raw
+
+debug() { sed 's/^/DEBUG: /' <<EOF ; }
+$*
+EOF
 
 # doc is commented at the beggining of the script until first empty line
 doc () { sed -n '2,/^$/ { s/^ *#// ; s/^ //g ; t ok ; d ; :ok ; p }' <$0 ; }
 
 # die with an error message
-die () { echo "$(basename $0): error: $*" 1>&2 ; exit 1 ; }
+die () { echo "${0##*/}: error: $*" 1>&2 ; exit 1 ; }
 
 # run a command silently
 mute () { 1>/dev/null 2>&1 $* ; }
@@ -79,11 +91,11 @@ vrfy ()
 # add $2 in $1 encoded as $3 eventually using $4 as tags
 add_file ()
 {
-    f=$(basename $2)
+    f=${2##*/}
 
-	if list_files $1 $4 | grep -q $f ; then
-		die "file already included"
-	fi
+    if list_files $1 $4 | grep -wxq $f ; then
+        die "file already included"
+    fi
     
     if [ "x$3" = "xbase64" ] ; then
         t=$(mktemp)
@@ -110,19 +122,28 @@ add_file ()
     [ $t ] && rm $t 
 }
 
-# update $2 in $1
+# update $2 in $1 eventually using $3 as tags
 update_file ()
 {
-    f=$(basename $2)
+    f=${2##*/}
 
-    enc=$(sed -nr 's/^# begin(-[^- ]+)* '"$f"' (.*)$/\2/; t o; b; :o p' "$1")
-    if [ "x$enc" = xbase64 ] ; then
+    enc=$(sed -nr \
+              '{ s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"' (.*)$/\3/ ;
+                 t o; b; :o p
+               }' "$1")
+
+    if [ "x$enc" = "xbase64" ] ; then
         t=$(mktemp)
         base64 "$2" > "$t"
-        set "$1" "$t"
+        set "$1" "$t" "$3" 
+    else
+        set "$1" "$2" "$3"
     fi
 
-    tags=$(sed -nr 's/^# begin((-[^- ]+)*) '"$f"' .*$/\1/; t o; b; :o p' "$1")
+    tags=$(sed -nr \
+               '{ s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"' .*$/\1/ ;
+                  t o; b; :o p
+                }' "$1")
     
     sed -i -r \
         -e '/^# begin'"$tags"' '"$f"'($| .*$)/ a\# begin+tmp'"$tags"'' \
@@ -136,16 +157,24 @@ update_file ()
     [ $t ] && rm $t 
 }
 
-# extract $2 from $1
+# extract $2, eventually tagged with $3, from $1
 extract_file ()
 {
-    enc=$(sed -nr 's/^# begin(-[^- ]+)* '"$2"' (.*)$/\2/; t o; b; :o p' "$1")
+    f=${2##*/}
+
+    enc=$(sed -nr \
+              '{ s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"' (.*)$/\3/ ;
+                 t o; b; :o p
+               }' "$1")
     cmd=cat
     [ x$enc = xbase64 ] && cmd="base64 -d"
 
-    tags=$(sed -nr 's/^# begin((-[^- ]+)*) '"$2"' .*$/\1/; t o; b; :o p' "$1")
+    tags=$(sed -nr \
+               '{ s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"' .*$/\1/ ;
+                  t o; b; :o p
+                }' "$1")
     
-    sed -nr '/^# begin'"$tags"' '"$2"'($| .*$)/,/^# end '"$2"'$/ p' "$1" \
+    sed -nr '/^# begin'"$tags"' '"$f"'($| .*$)/,/^# end '"$f"'$/ p' "$1" \
         | sed '1d ; $d' \
         | $cmd > "$2"
 }
@@ -190,15 +219,15 @@ list_tags()
     | sort | uniq
 }
 
-# remove $2 from $1
+# remove $2, eventually tagged with $3,  from $1
 remove_file ()
 {
-    f=${2##/*}
+    f=${2##*/}
 
-    list_files $1 | grep -q $2 || die "file not included $2"
+    list_files $1 $3 | grep -wxq $f || die "file not included $f"
 
     sed -i -r \
-        -e '/^# begin(-[^- ]+)* '"$f"'($| .*$)/,/^# end '"$f"' *$/ d' \
+        -e '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/,/^# end '"$f"' *$/ d' \
         $1
 }
 
@@ -233,35 +262,38 @@ SCRIPT=$1
 vrfy || die "needed tools are missing"
 [ -z $SCRIPT ] && die "no script specified"
 [ $# -gt 1 ] && die "too many script specified"
-[ "$ACTION" != "add_file" -a "$ACTION" != "list_files" -a -n "$TAGS" ] &&
-    die "-t usable only with -a, -l or -x"
     
 # Action
 case "$ACTION" in
-    "add_file"|"update_file")
+    "add_file")
         [ -z "$FILE" ] && die "no file specified"
         [ ! -r "$FILE" ] && die "cannot read $FILE"
         $ACTION "$SCRIPT" "$FILE" "$ENCODE" "$TAGS"
         ;;
+    "update_file")
+        [ -z "$FILE" ] && die "no file specified"
+        [ ! -r "$FILE" ] && die "cannot read $FILE"
+        $ACTION "$SCRIPT" "$FILE" "$TAGS"
+        ;;
     "extract_file")
         [ -z "$FILE" ] && die "no file specified"
-        $ACTION "$SCRIPT" "$FILE"
+        $ACTION "$SCRIPT" "$FILE" "$TAGS"
         ;;
     "update_all")
-        list_files "$SCRIPT" | while read file
+        list_files "$SCRIPT" "$TAGS" | while read file
         do
-            update_file "$SCRIPT" "$file"
+            update_file "$SCRIPT" "$file" "$TAGS"
         done
         ;;
     "extract_all")
-        list_files "$SCRIPT" | while read file
+        list_files "$SCRIPT" "$TAGS" | while read file
         do
-            extract_file "$SCRIPT" "$file"
+            extract_file "$SCRIPT" "$file" "$TAGS"
         done
         ;;
     "remove_file")
         [ -z "$FILE" ] && die "no file specified"
-        $ACTION "$SCRIPT" "$FILE"
+        $ACTION "$SCRIPT" "$FILE" "$TAGS"
         ;;
     "list_tags")
         list_tags "$SCRIPT"
