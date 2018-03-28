@@ -28,5 +28,4 @@ starting with ISO date of modification.
 This tool has been created by Bruno BEAUFILS and is distributed under the
 terms of the [*GNU General Public License, version 2*](LICENSE).
 
-Copyright (C) 2016,2018 Bruno BEAUFILS <bruno@boulgour.com>
-
+Copyright (C) 2016-2018 Bruno BEAUFILS <bruno@boulgour.com>
