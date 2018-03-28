@@ -85,16 +85,16 @@ EOF
 
 # reset files
 reset() {
-    for f in script file1 file2 file3 git.pdf md.pdf
+    for f in *.orig
     do
-        cp $f.orig $f
+        cp -f "$f" "${f%%.orig}"
     done
 }
 
 # remove all files
 clean () {
-    for f in script file1 file2 file3 git.pdf md.pdf
+    for f in *.orig
     do
-        rm $f.orig $f
+        rm -f "$f" "${f%%.orig}"
     done
 }
