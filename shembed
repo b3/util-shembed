@@ -95,7 +95,8 @@ get_enc()
     sed -nre \
         '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/ {
             s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| (.*$))/\4/ ; p
-        }' "$1"
+        }' "$1" \
+    | tail -1
 }
 
 # get full tags list of $2 in $1 when eventually tagged by $3
