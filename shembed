@@ -91,11 +91,10 @@ vrfy ()
 # get encodage of $2 in $1 eventually tagged by $3
 get_enc()
 {
-	local f=${2##*/}
+    local f=${2##*/}
     sed -nre \
         '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/ {
-            s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| (.*$))/\4/ ;
-            t o; b; :o p
+            s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| (.*$))/\4/ ; p
         }' "$1"
 }
 
@@ -103,11 +102,10 @@ get_enc()
 # if 2 is present more than once last one in the file is used
 get_tags()
 {
-	local f=${2##*/}
+    local f=${2##*/}
     sed -nre \
         '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/ {
-            s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"'($| .*$)/\1/ ;
-            t o; b; :o p
+            s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"'($| .*$)/\1/ ; p
          }' "$1" \
     | tail -1
 }
