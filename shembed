@@ -99,7 +99,7 @@ get_enc()
 }
 
 # get full tags list of $2 in $1 when eventually tagged by $3
-# if 2 is present more than once last one in the file is used
+# if $2 is present more than once last one in the file is used
 get_tags()
 {
     local f=${2##*/}
