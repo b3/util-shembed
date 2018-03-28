@@ -66,7 +66,7 @@ VERSION=1.1.20180327-2
 ACTION=list_files
 ENCODE=raw
 
-debug() { sed 's/^/DEBUG: /' <<EOF ; }
+debug() { sed 's/^/DEBUG: /' <<EOF 2>& 1; }
 $*
 EOF
 
@@ -88,10 +88,34 @@ vrfy ()
     mute which base64 || need base64
 }
 
+# get encodage of $2 in $1 eventually tagged by $3
+get_enc()
+{
+	local f=${2##*/}
+    sed -nre \
+        '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/ {
+            s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| (.*$))/\4/ ;
+            t o; b; :o p
+        }' "$1"
+}
+
+# get full tags list of $2 in $1 when eventually tagged by $3
+# if 2 is present more than once last one in the file is used
+get_tags()
+{
+	local f=${2##*/}
+    sed -nre \
+        '/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/ {
+            s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"'($| .*$)/\1/ ;
+            t o; b; :o p
+         }' "$1" \
+    | tail -1
+}
+
 # add $2 in $1 encoded as $3 eventually using $4 as tags
 add_file ()
 {
-    f=${2##*/}
+    local f=${2##*/}
 
     if list_files $1 $4 | grep -wxq $f ; then
         die "file already included"
@@ -105,12 +129,9 @@ add_file ()
         set "$1" "$2" "" "$4"
     fi
 
-    l=$(sed -n '/^# include '"$f"' *$/ =' "$1" | tail -1)
-    if [ -z "$l" ] ; then
-        l='$' ; cmd=
-    else
-        cmd="-e ${l}d"
-    fi
+    local l=$(sed -n '/^# include '"$f"' *$/ =' "$1" | tail -1)
+    local cmd="-e ${l}d"
+    [ -z "$l" ] && { l='$' ; cmd= ; }
 
     sed -i \
         -e "$l"' a\# begin'"$4"' '"$f"' '"$3" \
@@ -119,18 +140,15 @@ add_file ()
         $cmd \
         $1
 
-    [ $t ] && rm $t 
+    [ "$t" ] && rm $t 
 }
 
 # update $2 in $1 eventually using $3 as tags
 update_file ()
 {
-    f=${2##*/}
+    local f=${2##*/}
 
-    enc=$(sed -nr \
-              '{ s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/\3/ ;
-                 t o; b; :o p
-               }' "$1")
+    local enc=$(get_enc "$@")
 
     if [ "x$enc" = "xbase64" ] ; then
         t=$(mktemp)
@@ -140,11 +158,8 @@ update_file ()
         set "$1" "$2" "$3"
     fi
 
-    tags=$(sed -nr \
-               '{ s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"'($| .*$)/\1/ ;
-                  t o; b; :o p
-                }' "$1")
-    
+    local tags=$(get_tags "$@")
+
     sed -i -r \
         -e '/^# begin'"$tags"' '"$f"'($| .*$)/ a\# begin+tmp'"$tags"'' \
         -e '/^# end '"$f"' *$/ i\# end+tmp' \
@@ -154,26 +169,20 @@ update_file ()
         -e '/^# begin'"$tags"' '"$f"'($| .*$)/ r '"$2" \
         "$1"
         
-    [ $t ] && rm $t 
+    [ "$t" ] && rm $t 
 }
 
 # extract $2, eventually tagged with $3, from $1
 extract_file ()
 {
-    f=${2##*/}
+    local f=${2##*/}
 
-    enc=$(sed -nr \
-              '{ s/^# begin(-[^- ]+)*'"$3"'(-[^- ]+)* '"$f"'($| .*$)/\3/ ;
-                 t o; b; :o p
-               }' "$1")
-    cmd=cat
-    [ x$enc = xbase64 ] && cmd="base64 -d"
+    local enc=$(get_enc "$@")
+    local cmd=cat
+    [ "x$enc" = "xbase64" ] && cmd="base64 -d"
 
-    tags=$(sed -nr \
-               '{ s/^# begin((-[^- ]+)*'"$3"'(-[^- ]+)*) '"$f"'($| .*$)/\1/ ;
-                  t o; b; :o p
-                }' "$1")
-    
+    local tags=$(get_tags "$@")
+
     sed -nr '/^# begin'"$tags"' '"$f"'($| .*$)/,/^# end '"$f"'$/ p' "$1" \
         | sed '1d ; $d' \
         | $cmd > "$2"
@@ -232,7 +241,7 @@ remove_file ()
 }
 
 # Args processing
-while [ -n $1 ]
+while [ -n "$1" ]
 do
     case "$1" in
         "-a"|"--add") ACTION=add_file ; shift ; FILE=$1 ;;
@@ -243,7 +252,7 @@ do
         "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract_all ;;
         "-r"|"--remove") ACTION=remove_file ; shift ; FILE=$1 ;;
-        "-s"|"--shell") declare -f list_files extract_file ; exit 0 ;;
+        "-s"|"--shell") declare -f get_enc get_tags list_files extract_file ; exit 0 ;;
         "-b"|"--base64") ENCODE=base64 ;;   
         "-h"|"--help") doc ; exit 0 ;;
         "-V"|"--version") echo $VERSION ; exit 0 ;;
@@ -260,7 +269,7 @@ SCRIPT=$1
 
 # Common checks
 vrfy || die "needed tools are missing"
-[ -z $SCRIPT ] && die "no script specified"
+[ -z "$SCRIPT" ] && die "no script specified"
 [ $# -gt 1 ] && die "too many script specified"
     
 # Action
