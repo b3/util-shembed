@@ -31,6 +31,7 @@
 #     -x, --extract FILE   extract FILE
 #     -X, --extract-all    extract all files
 #     -r, --remove FILE    remove FILE
+#     -R, --remove-all     remove all files
 #     -s, --shell          show shell helper functions to include in script
 #     -V, --version        show version number
 #     -h, --help           show this help message
@@ -62,7 +63,7 @@
 #
 # See the README or COPYING file for details.
 
-VERSION=1.1.20180328-1
+VERSION=1.2.20180329-1
 ACTION=list_files
 ENCODE=raw
 
@@ -227,7 +228,7 @@ list_tags()
     | sort | uniq
 }
 
-# remove $2, eventually tagged with $3,  from $1
+# remove $2, eventually tagged with $3, from $1
 remove_file ()
 {
     f=${2##*/}
@@ -251,6 +252,7 @@ do
         "-x"|"--extract") ACTION=extract_file ; shift ; FILE=$1 ;;
         "-X"|"--extract-all") ACTION=extract_all ;;
         "-r"|"--remove") ACTION=remove_file ; shift ; FILE=$1 ;;
+        "-R"|"--remove-all") ACTION=remove_all ;;
         "-s"|"--shell") declare -f get_enc get_tags list_files extract_file ; exit 0 ;;
         "-b"|"--base64") ENCODE=base64 ;;   
         "-h"|"--help") doc ; exit 0 ;;
@@ -302,6 +304,12 @@ case "$ACTION" in
     "remove_file")
         [ -z "$FILE" ] && die "no file specified"
         $ACTION "$SCRIPT" "$FILE" "$TAGS"
+        ;;
+    "remove_all")
+        list_files "$SCRIPT" "$TAGS" | while read file
+        do
+            remove_file "$SCRIPT" "$file" "$TAGS"
+        done
         ;;
     "list_tags")
         list_tags "$SCRIPT"
