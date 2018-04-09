@@ -20,7 +20,7 @@ able to distribute a single command which do everything at once.
 Full documentation is included in the script itself and can be displayed when
 using the `--help` option.
 
-I try to follow [semantic versionning](https://semver.org/) with patch version
+I try to follow [semantic versioning](https://semver.org/) with patch version
 starting with ISO date of modification.
 
 ## License
