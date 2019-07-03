@@ -5,7 +5,7 @@ script is then able to list or extract it provided that it include some helper
 functions.
 
 In order to avoid shell conflicts, the included files are generally inserted
-after an explicit 'exit 0' at the end of the script, but it is possible to
+after an explicit `exit 0` at the end of the script. It is however possible to
 choose the location of inclusion. The tool enable binary file to be included
 in base64 form.
 
@@ -13,7 +13,7 @@ in base64 form.
 
 I create this file in order to publish simple shell wrappers embedding needed
 configuration file (for `openvpn` and `pandoc`/`pdflatex`). That way I was
-able to distribute a single command which do everything at once.
+able to distribute a single command which does everything at once.
 
 ## Documentation
 
