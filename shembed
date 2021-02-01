@@ -149,6 +149,7 @@ update_file ()
     local f=${2##*/}
 
     local enc=$(get_enc "$@")
+    local tags=$(get_tags "$@")
 
     if [ "x$enc" = "xbase64" ] ; then
         t=$(mktemp)
@@ -157,8 +158,6 @@ update_file ()
     else
         set "$1" "$2" "$3"
     fi
-
-    local tags=$(get_tags "$@")
 
     sed -i -r \
         -e '/^# begin'"$tags"' '"$f"'($| .*$)/ a\# begin+tmp'"$tags"'' \
